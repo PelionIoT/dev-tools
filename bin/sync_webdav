@@ -1,0 +1,774 @@
+#!/bin/bash
+
+
+
+#COLOR_BOLD="echo -ne '\E[1m'"
+#COLOR_RED="echo -ne '\E[31m'"
+#COLOR_MAGENTA="echo -ne '\E[35m'"
+#COLOR_YELLOW="echo -ne '\E[33m'"
+#COLOR_GREEN="echo -ne '\E[32m'"
+#COLOR_NORMAL="echo -ne '\E[0m'"
+
+if [ -e $HOME/dev-tools/bin/commons.source ]; then
+    source $HOME/dev-tools/bin/commons.source
+    setup_colors
+else
+    echo "Where is your $HOME/dev-tools/bin/commons.source ?"
+fi
+
+
+
+
+function print_usage () {
+	echo "$0 gets the prerequisite libs for this project"
+	echo " Usage: $0 {-m | -D | -U } [Other Options] URL "
+	echo "Options:"
+	echo " -p [PATH] only download this path under the URL"
+	echo " -n No confirmations. Just do it"
+	echo " -O Only this directory - don't recurse (that's a letter big-O)"
+	echo ""
+	echo " Mandatory options - choose one:"
+	echo " -m Mirror the whole URL. WARNING: This will erase anything currently in the directory"
+	echo " -D Show a list of files which differ from the server"
+	echo " -U UPLOAD changes"
+	
+	echo "NOTE: require .netrc file to be setup for authentication. See 'man cadaver' for details"
+}
+
+
+
+
+function onexit() {
+    local exit_status=${1:-$?}
+    eval $COLOR_RED
+    echo "Error - $0 did not complete."
+    eval $COLOR_NORMAL
+    rm -f *.tmp
+    exit $exit_status
+}
+
+function onerror() {
+    eval $COLOR_RED
+    echo "Error..."
+    eval $COLOR_YELLOW
+    echo "$@"
+    eval $COLOR_NORMAL
+    rm -f *.tmp
+    exit 1
+}
+
+
+
+
+
+
+
+#BASE_URL="http://izuma.repositoryhosting.com/webdav/izuma_frzwebproj"
+
+FILENAME_FILE=$$.filenames.tmp
+DELNAME_FILE=$$.deletme.tmp
+MD5_FILENAME="checksum.lst"
+
+#ALLDIRS="1"
+function get_remote_listing() {
+
+    TEMPNAME=$0.$$.tmp
+    TEMPNAME2=$0.$$-2.tmp
+
+    if [ -f $TEMPNAME ]; then
+	rm -rf $TEMPNAME
+    fi
+
+    
+
+    if [ ! -z $1 ]; then
+    cadaver $1 > $TEMPNAME << END
+ls
+END
+    else
+	onerror "No parameter for get_listing"
+	onexit
+    fi
+
+    echo " " >> $TEMPNAME
+    cat $TEMPNAME
+    echo "--------------"
+
+    if [ -f $TEMPNAME2 ]; then
+	rm -rf $TEMPNAME2
+    fi
+    touch $TEMPNAME2
+
+    cat $TEMPNAME | while read onel; do
+	DIRNAME=`echo "${onel}" | sed -e 's/^Coll:\s\+\(\S\+\)\s\+.*/Dir=\1/' -e '/Dir=/ !d' -e 's/^Dir=\(.*\)/\1/'` 
+#	echo "DIRNAME: ${one1} --> $DIRNAME"
+	echo -n "$DIRNAME " >> $TEMPNAME2
+    done
+
+    ALLDIRS=`cat $TEMPNAME2`
+    rm $TEMPNAME2
+    touch $TEMPNAME2
+
+    cat $TEMPNAME | while read onel; do
+	# remove lines beggining with: "Connection " "Listing " and "dav:" then grab file name minus a '*' in front of it
+	FNAME=`echo "${onel}" | sed -e '/^dav\:/ d' -e '/^Connection\s/ d' -e '/^Listing\s/ d' -e 's/\*\?\(\S*\)\s\+.*/F=\1/'  -e '/F=/ !d' -e 's/^F=\(.*\)/\1/'` 
+#	echo "FILENAME: ${one1} --> $FILENAME"
+	echo -n "$FNAME " >> $TEMPNAME2
+    done
+
+#    ALLFILES=`cat $TEMPNAME2`
+    mv $TEMPNAME2 $FILENAME_FILE
+#    echo "FILENAME_FILE $FILENAME_FILE"
+    cat $FILENAME_FILE
+#    rm $TEMPNAME2
+    
+    rm $TEMPNAME
+
+}
+
+function get_remote_dirs() {
+
+    TEMPNAME=$0.$$.tmp
+    TEMPNAME2=$0.$$-2.tmp
+
+    if [ -f $TEMPNAME ]; then
+	rm -rf $TEMPNAME
+    fi
+
+    if [ ! -z $1 ]; then
+    cadaver $1 > $TEMPNAME << END
+ls
+END
+    else
+	onerror "No parameter for get_listing"
+	onexit
+    fi
+
+    echo " " >> $TEMPNAME
+    cat $TEMPNAME
+    echo "--------------"
+
+    if [ -f $TEMPNAME2 ]; then
+	rm -rf $TEMPNAME2
+    fi
+    touch $TEMPNAME2
+
+    cat $TEMPNAME | while read onel; do
+	DIRNAME=`echo "${onel}" | sed -e 's/^Coll:\s\+\(\S\+\)\s\+.*/Dir=\1/' -e '/Dir=/ !d' -e 's/^Dir=\(.*\)/\1/'` 
+	echo -n "$DIRNAME " >> $TEMPNAME2
+    done
+
+    REMOTEDIRS=`cat $TEMPNAME2`
+    rm -f $TEMPNAME2
+    rm -f $TEMPNAME
+}
+
+
+
+function get_remote_files() {
+    TEMPNAME=$0.$$.tmp
+    if [ -f $TEMPNAME ]; then
+	rm -rf $TEMPNAME
+    fi
+
+    touch $TEMPNAME
+
+#DEBUG
+#    echo "FILENAME_FILE: $FILENAME_FILE"
+    cat $FILENAME_FILE
+
+    # build command file
+    for f in `cat $FILENAME_FILE`
+    do
+	echo "get ${f}" >> $TEMPNAME
+	echo "${f}" >> $TEMPNAME
+#	echo "REMOTE: $TEMPNAME"
+    done
+
+    if [ ! -z $1 ]; then
+	cat $TEMPNAME | cadaver $1
+    else
+	echo ERROR
+	exit
+    fi
+
+#    cat $TEMPNAME | cadaver $BASE_URL 
+    rm -rf $TEMPNAME
+    rm -f $FILENAME_FILE
+}
+
+
+function get_remote_checksum() {
+
+    TEMPNAME=$0.$$.tmp
+    if [ -f $TEMPNAME ]; then
+	rm -rf $TEMPNAME
+    fi
+    if [ -f $MD5_FILENAME.remote ]; then
+	rm -rf $MD5_FILENAME.remote 
+    fi
+
+    # build command file
+    echo "get $MD5_FILENAME" >> $TEMPNAME
+    echo "$MD5_FILENAME.remote" >> $TEMPNAME
+
+    if [ ! -z $1 ]; then
+	cat $TEMPNAME | cadaver $1
+    else
+	echo ERROR
+	exit
+    fi
+
+#    cat $TEMPNAME | cadaver $BASE_URL 
+    rm -rf $TEMPNAME
+}
+
+function find_changed_files() {
+    
+    produce_md5_file 
+
+    setup_filename_files
+
+    get_remote_checksum $1  # grab the checksume file on far end
+
+    # get sums for each  file name, store in a variable...
+    TEMP_SCRIPT=awks.$$.tmp
+
+    cat $MD5_FILENAME | while read lne; do
+#    echo "line: ${lne}"
+	
+
+	NAME=`echo "$lne" | awk '{print $2}'`
+	echo $NAME
+#	EVALS="\"$NAME\" == LOOKUPVAL { print \$1 }"
+#	LOCAL=`awk -vLOOKUPVAL="$NAME" '"$NAME" == LOOKUPVAL { print $1 }' < $MD5_FILENAME`
+	cat > $TEMP_SCRIPT <<EOF
+awk -vLOOKUPVAL="$NAME" '\$2 == LOOKUPVAL { print \$1 }' < \$1
+EOF
+#	LOCAL=`awk -vLOOKUPVAL="\"$NAME\"" "$EVALS" < $MD5_FILENAME.remote`
+#	REMOTE=`awk -vLOOKUPVAL="$NAME" '"$NAME" == LOOKUPVAL { print $1 }' < $MD5_FILENAME.remote`
+        LOCAL=`source $TEMP_SCRIPT $MD5_FILENAME`
+	if [ ! -f $MD5_FILENAME.remote ]; then
+	    eval $COLOR_YELLOW
+	    echo "No remote checksum file..."
+	    eval $COLOR_NORMAL
+	    REMOTE=""
+	else
+	    REMOTE=`source $TEMP_SCRIPT $MD5_FILENAME.remote`
+	fi
+#	echo "awk -vLOOKUPVAL="\"$NAME\"" $EVALS < $MD5_FILENAME"
+#	echo "awk -vLOOKUPVAL="\"$NAME\"" "$EVALS" < $MD5_FILENAME.remote"
+#	echo "LOCAL: $LOCAL"
+#	echo "REMOTE: $REMOTE"
+	
+	if [ -z $REMOTE ]; then
+	    eval $COLOR_BOLD
+	    echo "not on remote: $NAME"
+	    eval $COLOR_NORMAL	
+	    echo "$NAME" >> $FILENAME_FILE
+	else 
+#	    if [ -z $LOCAL ]; then  # this is impossible
+#		eval $COLOR_BOLD
+#		echo "not on local: $NAME"
+#		eval $COLOR_NORMAL		    
+#		echo "$NAME" >> $DELNAME_FILE
+#		# you would delete here
+#	    else 
+		if [ $LOCAL != $REMOTE ]; then
+		    eval $COLOR_BOLD
+		    echo "diff: $NAME"
+		    eval $COLOR_NORMAL
+		    echo "$NAME" >> $FILENAME_FILE
+		fi
+#	    fi
+	fi
+
+#	rm -f $TEMP_SCRIPT
+#	eval "F_$NAME="
+    done
+
+
+    cat $MD5_FILENAME.remote | while read lne; do
+	NAME=`echo "$lne" | awk '{print $2}'`
+
+	cat > $TEMP_SCRIPT <<EOF
+awk -vLOOKUPVAL="$NAME" '\$2 == LOOKUPVAL { print \$1 }' < \$1
+EOF
+	LOCAL=`source $TEMP_SCRIPT $MD5_FILENAME`
+
+	if [ -z $LOCAL ]; then
+	    eval $COLOR_BOLD
+	    echo "not on local: $NAME"
+	    eval $COLOR_NORMAL		    
+	    echo "$NAME" >> $DELNAME_FILE
+	    (( C++ ))
+	fi
+    done
+    
+    rm -f $MD5_FILENAME.remote
+    rm -f $TEMP_SCRIPT
+
+#    export CHANGE_COUNT=$CHANGE_COUNT
+    echo $CHANGE_COUNT
+}
+
+
+function print_changed_files() {
+    eval $COLOR_BOLD
+    echo " ---------- file diffs for: $1 --------"
+    eval $COLOR_NORMAL
+
+    cat $FILENAME_FILE | while read lne; do
+	eval $COLOR_BOLD
+	echo "File: $lne"
+	eval $COLOR_NORMAL
+    done
+
+    cat $DELNAME_FILE | while read lne; do
+	eval $COLOR_BOLD
+	echo "Not on local, but on server: $lne"
+	eval $COLOR_NORMAL
+    done
+
+    eval $COLOR_BOLD
+    echo " ---------- end of diffs for $1 ------- "
+    eval $COLOR_NORMAL
+
+}
+
+
+function remove_filename_files() {
+    if [ -f $FILENAME_FILE ]; then
+	rm -f $FILENAME_FILE
+    fi
+    if [ -f $DELNAME_FILE ]; then
+	rm -f $DELNAME_FILE
+    fi
+}
+
+function setup_filename_files() {
+    if [ -f $FILENAME_FILE ]; then
+	rm -rf $FILENAME_FILE
+    fi
+    touch $FILENAME_FILE
+    if [ -f $DELNAME_FILE ]; then
+	rm -rf $DELNAME_FILE
+    fi
+    touch $DELNAME_FILE
+}
+
+function upload_changed_files() {
+    TEMPNAME=$0.$$.tmp
+
+    if [ -f $TEMPNAME ]; then
+	rm -rf $TEMPNAME
+    fi
+
+    if [ ! -f $FILENAME_FILE ]; then
+	onerror "Could not fine temp file: $FILENAME_FILE"
+    fi
+
+    cat $FILENAME_FILE | while read lne; do
+	eval $COLOR_MAGENTA
+	echo "Uploading file: $lne"
+	eval $COLOR_NORMAL
+	cadaver $1 > $TEMPNAME << END
+put $lne
+END
+    done
+
+    rm -f $TEMPNAME
+}
+
+function remove_nolocal_files() {
+    TEMPNAME=$0.$$.tmp
+
+    if [ -f $TEMPNAME ]; then
+	rm -rf $TEMPNAME
+    fi
+
+    DELTHIS=`cat $DELNAME_FILE`
+
+#    cat $DELNAME_FILE | while read lne; do
+    for lne in $DELTHIS
+    do
+	eval $COLOR_MAGENTA
+	echo "Removing file: $lne"
+	if [ ! -z $NOCONFIRM_MODE ]; then
+	    cadaver $1 > $TEMPNAME << END
+rm $lne
+END
+	else
+	    eval $COLOR_YELLOW
+	    echo "Confirm removal (y/n)?"
+	    read YN 
+	    case $YN in
+		[yY]*) 
+		    cadaver $1 > $TEMPNAME << END
+rm $lne
+END
+		    echo "Removed $lne"
+		    ;;
+		[nN]*) 	    
+		    echo "did not remove remote file $lne"
+		    ;;
+	    esac
+	    eval $COLOR_NORMAL
+	fi
+    done
+
+    rm -f $TEMPNAME    
+}
+
+function upload_checksum() {
+    
+    TEMPNAME=$0.$$.tmp
+    
+    if [ -f $TEMPNAME ]; then
+	rm -rf $TEMPNAME
+    fi
+    
+    eval $COLOR_MAGENTA
+    echo "Uploading checksum - $MD5_FILENAME"
+    eval $COLOR_NORMAL
+    
+    cadaver $1 > $TEMPNAME << END
+put $MD5_FILENAME
+END
+	
+    rm -f $TEMPNAME
+	
+}
+
+function produce_md5_file() {
+    if [ -f $MD5_FILENAME ]; then
+	rm -f $MD5_FILENAME || onerror "Could not remove $MD5_FILENAME"
+	touch $MD5_FILENAME
+    fi
+    
+#    for F in  `ls -l | grep ^- | awk '{print $8}'` 
+    for F in  `ls -l --time-style="+%b-%d-%Y" | grep ^- | awk '{print $7}'` 
+    do
+	if [ "$F" != "$MD5_FILENAME" ]; then
+	    md5sum $F >> $MD5_FILENAME
+	fi
+    done
+    
+}
+
+function get_local_dirs() {
+    LOCALDIRS=`ls -l --time-style="+%b-%d-%Y" | grep ^d | awk '{print $7}' | sed ':a;N;$!ba;s/\n/ /g'` 
+#    LOCALDIRS=`ls -l | grep ^d | awk '{print $8}' | sed ':a;N;$!ba;s/\n/ /g'` 
+}
+
+
+
+function make_dirs() {
+    for f in $@
+    do
+	if [ ! -d ${f} ]; then
+	    eval $COLOR_MAGENTA
+	    echo "local mkdir ${f}"
+	    eval $COLOR_NORMAL
+	    mkdir -p ${f}
+	fi
+    done
+}
+
+# $1 URL
+# $2 Directory
+function make_remote_dir() {
+    TEMPNAME=$0.$$.tmp
+    
+    if [ -f $TEMPNAME ]; then
+	rm -rf $TEMPNAME
+    fi
+
+    eval $COLOR_MAGENTA
+    echo "Creating remote directory $2"
+    eval $COLOR_NORMAL
+    cadaver $1 > $TEMPNAME << END
+mkcol $2
+END
+    rm -f $TEMPNAME
+}
+
+# $1 URL
+# $2 Directory
+function remove_remote_dir() {
+    TEMPNAME=$0.$$.tmp
+    
+    if [ -f $TEMPNAME ]; then
+	rm -rf $TEMPNAME
+    fi
+
+    eval $COLOR_MAGENTA
+    echo "Removing remote directory $2"
+    eval $COLOR_NORMAL
+    cadaver $1 > $TEMPNAME << END
+rmcol $2
+END
+    rm -f $TEMPNAME
+}
+
+
+
+function sync_dirs() {
+    # $1 is URL
+    # $2 is local dirs
+    # $3 is remote dirs
+    # local directories are the master
+    
+    for here in $2
+    do
+	FOUND="0"
+	for there in $3
+	do
+#	    echo "THERE:<$there> HERE:<$here>"
+	    if [ "$here" == "$there" ]; then
+		FOUND="1"
+	    fi
+	done
+	if [ "$FOUND" != "1" ]; then
+	    make_remote_dir $1 $here
+	fi
+    done
+
+    for there in $3
+    do
+	FOUND="0"
+	for here in $2
+	do
+	    if [ "$here" == "$there" ]; then
+		FOUND="1"
+	    fi
+	done
+	if [ "$FOUND" != "1" ]; then
+	    if [ ! -z $NOCONFIRM_MODE ]; then
+		remove_remote_dir $1 $there
+	    else
+		eval $COLOR_YELLOW
+		echo "Confirm removal of remote folder: $1/$there (y/n)?"
+		read YN 
+		case $YN in
+		    [yY]*) 
+			remove_remote_dir $1 $there
+			echo "Removed $there"
+			;;
+		    [nN]*) 	    
+			echo "did not remove remote folder $there"
+			;;
+		esac
+		eval $COLOR_NORMAL
+	    fi
+	fi
+    done
+}
+
+# $1 is the full URL + directory
+# $2 is just the directory
+function mirror_webdav_dir() {
+    if [ ! -z $2 ]; then
+	eval $COLOR_BOLD
+	echo "Going into $2"
+	eval $COLOR_NORMAL
+	pushd $2 > /dev/null
+    fi
+#    if [ -z $1 ]; then
+#	get_remote_listing
+#	get_all_files
+#    else
+    get_remote_listing $1
+    get_remote_files $1
+    produce_md5_file
+#    fi
+    echo "directories: $ALLDIRS"
+    echo "files: $ALLFILES"
+
+    make_dirs $ALLDIRS
+    if [ -z $NO_RECURSE ]; then
+	for D in $ALLDIRS
+	do
+	    eval $COLOR_YELLOW
+            mirror_webdav_dir $1/$D $D
+	    eval $COLOR_NORMAL
+	done
+    fi
+    if [ ! -z $2 ]; then
+	popd > /dev/null
+    fi
+}
+
+# $1 is the full URL + directory
+# $2 is just the directory
+function sync_webdav_dir() {
+    if [ ! -z $2 ]; then
+	eval $COLOR_BOLD
+	echo "Going into $2"
+	eval $COLOR_NORMAL
+	pushd $2 > /dev/null
+    fi
+
+    find_changed_files $1
+    print_changed_files $1
+    upload_changed_files $1
+    remove_nolocal_files $1
+    upload_checksum $1
+    
+    remove_filename_files
+
+    get_local_dirs
+    get_remote_dirs $1
+    echo "LOCAL folders: $LOCALDIRS"
+    echo "REMOTE folders: $REMOTEDIRS"
+    
+    sync_dirs $1 "$LOCALDIRS" "$REMOTEDIRS"
+
+    if [ -z $NO_RECURSE ]; then
+	for D in $LOCALDIRS
+	do
+	    eval $COLOR_YELLOW
+
+            sync_webdav_dir $1/$D $D
+	    
+#	echo $D
+	    eval $COLOR_NORMAL
+	done
+    fi
+    if [ ! -z $2 ]; then
+	popd > /dev/null
+    fi
+}
+
+# $1 is the full URL + directory
+# $2 is just the directory
+function showdiff_webdav_dir() {
+    if [ ! -z $2 ]; then
+	eval $COLOR_BOLD
+	echo "Going into $2"
+	eval $COLOR_NORMAL
+	pushd $2 > /dev/null
+    fi
+
+    find_changed_files $1
+    print_changed_files $1
+    remove_filename_files
+
+    get_local_dirs
+    get_remote_dirs $1
+    echo "LOCAL folders: $LOCALDIRS"
+    echo "REMOTE folders: $REMOTEDIRS"
+ 
+    if [ -z $NO_RECURSE ]; then
+	for D in $LOCALDIRS
+	do
+	    eval $COLOR_YELLOW
+            showdiff_webdav_dir $1/$D $D
+#	echo $D
+	    eval $COLOR_NORMAL
+	done
+    fi
+    if [ ! -z $2 ]; then
+	popd > /dev/null
+    fi
+}
+
+
+
+
+trap onexit 1 2 3 15 ERR
+
+while getopts "hp:OmDUn" opt; do
+    case $opt in
+	h)
+	    print_usage
+	    exit
+	;;
+	p)
+	    eval $COLOR_YELLOW
+    	    SUB_PATH=${OPTARG}
+	    echo "just downloading $SUB_PATH"
+	    eval $COLOR_NORMAL
+	;;
+	m)
+	    eval $COLOR_MAGENTA
+	    echo "Mirroring..."
+	    eval $COLOR_NORMAL
+	    MIRROR_MODE="1"
+	    ;;
+	n)
+	    NOCONFIRM_MODE="1"
+	    ;;
+	O)
+	    NO_RECURSE="1"
+	    ;;
+	D)
+	    eval $COLOR_MAGENTA
+	    echo "Show differences only..."
+	    eval $COLOR_NORMAL
+	    MIRROR_MODE=""
+	    DIFF_ONLY="1"
+	    ;;
+	U)
+	    eval $COLOR_MAGENTA
+	    echo "Uploading differences..."
+	    eval $COLOR_NORMAL
+	    MIRROR_MODE=""
+	    DIFF_ONLY=""
+	    UPLOAD_CHG="1"
+	    ;;
+	\?) 
+	    echo "Unknown option: -$OPTARG"
+	    exit 1
+	    ;;
+	:)
+	    echo "Option -$OPTARG requires an argument"
+	    exit 1
+	    ;;
+    esac
+done
+
+
+
+shift $(($OPTIND - 1))
+
+
+if [ $# -lt 1 ]; then
+    print_usage
+    exit
+fi
+
+eval $COLOR_YELLOW
+echo "URL: $1"
+eval $COLOR_NORMAL
+
+if [ "$MIRROR_MODE" != "" ]; then
+    if [ -z $SUB_PATH ]; then
+	mirror_webdav_dir $1
+    else
+	mirror_webdav_dr $1/$SUB_PATH $SUB_PATH
+    fi
+else
+
+    if [ "$DIFF_ONLY" != "" ]; then
+	if [ -z $SUB_PATH ]; then
+	    showdiff_webdav_dir $1
+	else
+	    showdiff_webdav_dr $1/$SUB_PATH $SUB_PATH
+	fi
+    fi
+
+    if [ "$UPLOAD_CHG" != "" ]; then
+	if [ -z $SUB_PATH ]; then
+	    sync_webdav_dir $1
+	else
+	    sync_webdav_dr $1/$SUB_PATH $SUB_PATH
+	fi
+    fi
+
+fi
+
+
+
+
+

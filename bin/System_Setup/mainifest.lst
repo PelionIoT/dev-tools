@@ -1,0 +1,5 @@
+# OS binaries
+framez-jars/framez-controller-rev505.jar:lib/framez-controller.jar
+framez-jars/framez-export/log4j.properties:lib/log4j.properties
+framez-jars/qooxdoo-rpc-java-rev506.jar:lib/qooxdoo-rpc-java.jar
+framez-jars/framez-utilz-rev505.jar:lib/framez-utilz.jar

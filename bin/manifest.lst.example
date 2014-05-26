@@ -1,0 +1,30 @@
+# test
+# Java prerequisites...
+# MDNS jar
+java-libs/dns_sd.jar:lib/dns_sd.jar
+
+java-libs/hexdump-0.2.jar:lib/hexdump.jar
+# Unix domain socket lib
+java-libs/unix-0.5.jar:lib/unix.jar
+
+# Jetty 6
+java-libs/jetty-6-libs/jetty-6.1.15.jar:lib/jetty-6/jetty-6.jar
+java-libs/jetty-6-libs/jetty-util-6.1.15.jar:lib/jetty-6/jetty-util-6.jar
+java-libs/jetty-6-libs/servlet-api-2.5-20081211.jar:lib/jetty-6/servlet-api.jar
+java-libs/jetty-6-libs/start.jar:lib/jetty-6/start.jar
+java-libs/commons-beanutils-1.6.1.jar:lib/commons-beanutils.jar
+java-libs/commons-collections-2.1.jar:lib/commons-collections.jar
+java-libs/log4j-1.2.15.jar:lib/log4j.jar
+
+# native libraries for above
+jni-libs/x86/libdns_sd.so:jni-libs/x86/libdns_sd.so
+jni-libs/x86/libjdns_sd.so:jni-libs/x86/libjdns_sd.so
+jni-libs/x86/libnss_mdns-0.2.so:jni-libs/x86/libnss_mdns-0.2.so
+jni-libs/x86/libunix-java.so:jni-libs/x86/libunix-java.so
+
+# Framez JARs
+framez-jars/framez-controller-rev505.jar:lib/framez-controller.jar
+framez-jars/framez-export/log4j.properties:lib/log4j.properties
+framez-jars/qooxdoo-rpc-java-rev506.jar:lib/qooxdoo-rpc-java.jar
+framez-jars/framez-utilz-rev505.jar:lib/framez-utilz.jar
+

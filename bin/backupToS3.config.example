@@ -1,0 +1,31 @@
+# backup config file - example
+
+# Directory to save daily tar.gz backup files to e.g /backups
+BACKUPDIR="/tmp/backups"
+
+# S3 Settings
+# The name of the S3 bucket to upload to e.g. "my_s3_bucket"
+S3BUCKET="FRZ-DEVBACKUP"
+
+# Mail setup
+# What would you like to be mailed to you?
+# - log   : send only log file
+# - files : send log file and tar.gz files as attachments
+# - stdout : will simply output the log to the screen if run manually.
+# - quiet : Only send logs if an error occurs to the MAILADDR.
+MAILCONTENT="log"
+
+# Set the maximum allowed email size in k. (4000 = approx 5MB email [see docs])
+MAXATTSIZE="4000"
+
+# Email Address to send mail to? (user@domain.com)
+MAILADDR="edhemphill@izuma.net"
+
+# Command to run before backups (uncomment to use)
+#PREBACKUP="/etc/backup-pre"
+
+# Command run after backups (uncomment to use)
+#POSTBACKUP="/etc/backup-post"
+
+S3CMD=$HOME/s3cmd-tools/s3cmd
+
