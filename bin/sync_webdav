@@ -568,9 +568,9 @@ function sync_dirs() {
     done
 }
 
-function mirror_webdev_dir2() {
-    
-}
+#function mirror_webdev_dir2() {
+#
+#}
 
 # $1 is the full URL + directory
 # $2 is just the directory
