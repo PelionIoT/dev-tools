@@ -1,6 +1,9 @@
 #!/bin/bash
 
 
+# NOTE: this requires the cadaver version here be installed https://github.com/WigWagCo/cadaver
+# this -A option is our own creation
+CADAVER="cadaver -A"
 
 #COLOR_BOLD="echo -ne '\E[1m'"
 #COLOR_RED="echo -ne '\E[31m'"
@@ -32,7 +35,7 @@ function print_usage () {
 	echo " -D Show a list of files which differ from the server"
 	echo " -U UPLOAD changes"
 	
-	echo "NOTE: require .netrc file to be setup for authentication. See 'man cadaver' for details"
+	echo "NOTE: require .netrc file to be setup for authentication. See 'man $CADAVER' for details"
 }
 
 
@@ -82,7 +85,7 @@ function get_remote_listing() {
     
 
     if [ ! -z $1 ]; then
-    cadaver $1 > $TEMPNAME << END
+    $CADAVER $1 > $TEMPNAME << END
 ls
 END
     else
@@ -136,7 +139,7 @@ function get_remote_dirs() {
     fi
 
     if [ ! -z $1 ]; then
-    cadaver $1 > $TEMPNAME << END
+    $CADAVER $1 > $TEMPNAME << END
 ls
 END
     else
@@ -186,13 +189,13 @@ function get_remote_files() {
     done
 
     if [ ! -z $1 ]; then
-	cat $TEMPNAME | cadaver $1
+	cat $TEMPNAME | $CADAVER $1
     else
 	echo ERROR
 	exit
     fi
 
-#    cat $TEMPNAME | cadaver $BASE_URL 
+#    cat $TEMPNAME | $CADAVER $BASE_URL 
     rm -rf $TEMPNAME
     rm -f $FILENAME_FILE
 }
@@ -213,13 +216,13 @@ function get_remote_checksum() {
     echo "$MD5_FILENAME.remote" >> $TEMPNAME
 
     if [ ! -z $1 ]; then
-	cat $TEMPNAME | cadaver $1
+	cat $TEMPNAME | $CADAVER $1
     else
 	echo ERROR
 	exit
     fi
 
-#    cat $TEMPNAME | cadaver $BASE_URL 
+#    cat $TEMPNAME | $CADAVER $BASE_URL 
     rm -rf $TEMPNAME
 }
 
@@ -372,7 +375,7 @@ function upload_changed_files() {
 	eval $COLOR_MAGENTA
 	echo "Uploading file: $lne"
 	eval $COLOR_NORMAL
-	cadaver $1 > $TEMPNAME << END
+	$CADAVER $1 > $TEMPNAME << END
 put $lne
 END
     done
@@ -395,7 +398,7 @@ function remove_nolocal_files() {
 	eval $COLOR_MAGENTA
 	echo "Removing file: $lne"
 	if [ ! -z $NOCONFIRM_MODE ]; then
-	    cadaver $1 > $TEMPNAME << END
+	    $CADAVER $1 > $TEMPNAME << END
 rm $lne
 END
 	else
@@ -404,7 +407,7 @@ END
 	    read YN 
 	    case $YN in
 		[yY]*) 
-		    cadaver $1 > $TEMPNAME << END
+		    $CADAVER $1 > $TEMPNAME << END
 rm $lne
 END
 		    echo "Removed $lne"
@@ -432,7 +435,7 @@ function upload_checksum() {
     echo "Uploading checksum - $MD5_FILENAME"
     eval $COLOR_NORMAL
     
-    cadaver $1 > $TEMPNAME << END
+    $CADAVER $1 > $TEMPNAME << END
 put $MD5_FILENAME
 END
 	
@@ -487,7 +490,7 @@ function make_remote_dir() {
     eval $COLOR_MAGENTA
     echo "Creating remote directory $2"
     eval $COLOR_NORMAL
-    cadaver $1 > $TEMPNAME << END
+    $CADAVER $1 > $TEMPNAME << END
 mkcol $2
 END
     rm -f $TEMPNAME
@@ -505,7 +508,7 @@ function remove_remote_dir() {
     eval $COLOR_MAGENTA
     echo "Removing remote directory $2"
     eval $COLOR_NORMAL
-    cadaver $1 > $TEMPNAME << END
+    $CADAVER $1 > $TEMPNAME << END
 rmcol $2
 END
     rm -f $TEMPNAME
@@ -563,6 +566,10 @@ function sync_dirs() {
 	    fi
 	fi
     done
+}
+
+function mirror_webdev_dir2() {
+    
 }
 
 # $1 is the full URL + directory
