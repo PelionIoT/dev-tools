@@ -264,7 +264,7 @@ function Apt-get-typical32 { #WigWag required software for 64station
 
 
 function Apt-get-all-typical {
-    sudo apt-get -y install acl autoconf autotools-dev bison build-essential cadaver davfs2 dpkg-dev emacs emacs-goodies-el flex fusedav g++ git gcc gnome-session-fallback libboost-all-dev libcurl3 libftdi-dev libncurses5-dev libdevice-serialport-perl libterm-readkey-perl libsvn-java linux-headers-`uname -r` make nano patch openjdk-6-jdk srecord ssh subversion texinfo xterm
+sudo apt-get -y install acl autoconf autotools-dev bison build-essential cmake davfs2 dpkg-dev emacs emacs-goodies-el flex fusedav g++ git gcc gnome-session-fallback libboost-all-dev libc6-dev libcurl3 libdevice-serialport-perl libexpat1-dev libftdi-dev libncurses5-dev libpcap0.8-dev libqt4-dev libterm-readkey-perl libsvn-java linux-headers-`uname -r` make nano openjdk-6-jdk patch qt4-qmake srecord ssh subversion texinfo tshark xterm
     system_type=$(detect_bits)
     if [ $(getconf LONG_BIT) = "64" ]; then
         Apt-get-typical64
@@ -309,7 +309,6 @@ function fix_ftdi_user { #fix ftdi group users
 #--------------------------------------------------------------------------------------
 #-----USER Stuff-----------------------------------------------------------------------
 #--------------------------------------------------------------------------------------
-
 create_path_dir() {
     echo "XXXX create_path_dir($1)"
     if [ ! -d /home/$1/.paths ]; then #if it doesn't exist, 
@@ -373,6 +372,43 @@ echo "COMMAND: chown -R $1:$1 /home/$1/"
     eval $acmd
 }
 
+#checkout any git project
+function checkout_git(){
+    gitline="$1:$2@github.com"
+    proj=$4
+    mhome=/home/$3
+echo "RUNNING: Checkout $3 project at $mhome using $1:$2@github.com"
+  cd $mhome
+    if [ -d $mhome  ]; then
+        cd $mhome
+	cd workspace
+	echo 	git clone https://$gitline/WigWagCo/$proj
+	git clone https://$gitline/WigWagCo/$proj
+	fix_user_permissions $3
+    else
+        echo "Failed: could not find directory $mhome"
+    fi
+}
+
+function process_prereqs(){
+user=$1
+path=$2
+su $user <<EOF
+source ~/.profile
+cd $path
+echo $path
+update-prereqs.sh
+expand-prereqs.sh
+EOF
+}
+function checkout_git-generic(){
+    checkout_git $1 $2 $3 $4
+    process_prereqs $3 /home/$3/workspace/$4
+}
+
+
+#$cmd="$cmd;fix_user_permissions $SUDO_USER"		    cmd="$cmd;update-prereqs.sh;expand-prereqs.sh"
+#		    cmd="$cmd;fix_user_permissions $SUDO_USER"
 
 
 
@@ -552,7 +588,7 @@ radio_ray=("update" "update the OS (comlete ubuntu update" OFF "install" "Instal
 }
 
 develop_task_menu () {
- radio_ray=("update" "update the OS (comlete ubuntu update)" OFF "install" "Install all apt-get things" OFF "WigWag-properties" "Setup WigWag groups, fix FTDI etc.." OFF "Setup/Repair-User" "Setup or repair a WigWag User" OFF)
+ radio_ray=("update" "update the OS (comlete ubuntu update)" OFF "install" "Install all apt-get things" OFF "WigWag-properties" "Setup WigWag groups, fix FTDI etc.." OFF "Setup/Repair-User" "Setup or repair a WigWag User" OFF "Clone_contiki-main" "Clone contiki-main" OFF "Clone_contiki-LEDE" "Clone contiki-LEDE" OFF)
         Result=$(wp-getResults wp-check "List test" "Selection for a Developer System" radio_ray)
         echo "$Result"
 }
@@ -566,14 +602,40 @@ svn_unp=""
 git_un=""
 git_unp=""
 
-user_info() {
-OS_un=$(wp-getResults wp-input "System username" "What username do you want for this System? (caps count!)" "$SUDO_USER")
-OS_unp=$(wp-getResults wp-pass "$un password" "User: $un password?")
-svn_un=$(wp-getResults wp-input "SVN username" "User: $un izuma.repositoryhosting.com username?" "$SUDO_USER")
-svn_unp=$(wp-getResults wp-pass "$svn_un password" "User: $svn_un @izuma.repositoryhosting.com  password?" "")
-git_un=$(wp-getResults wp-input "github username" "User $un github username?" "$SUDO_USER")
-git_unp=$(wp-getResults wp-pass "$svn_un password" "User: $git_un @github.com password?" "")
+
+
+user_info_svn(){
+if [ "$svn_un" == "" ]; then
+    svn_un=$(wp-getResults wp-input "SVN username" "User: $un izuma.repositoryhosting.com username?" "$SUDO_USER")
+    svn_unp=$(wp-getResults wp-pass "$svn_un password" "User: $svn_un @izuma.repositoryhosting.com  password?" "")
+fi
 }
+
+user_info_system(){
+if [ "$OS_un" == "" ]; then
+    OS_un=$(wp-getResults wp-input "System username" "What username do you want for this System? (caps count!)" "$SUDO_USER")
+    OS_unp=$(wp-getResults wp-pass "$un password" "User: $un password?")
+fi
+}
+
+user_info_git(){
+if [ "$git_un" == "" ]; then
+    git_un=$(wp-getResults wp-input "github username" "User $un github username?" "$SUDO_USER")
+    git_unp=$(wp-getResults wp-pass "$svn_un password" "User: $git_un @github.com password?" "")
+fi
+}
+
+
+user_info_ALL() {
+    user_info_system
+    user_info_svn
+    user_info_git
+    cat "$OS_un\n$OS_UNp\n$svn_un\n$svn_up\n$git_un\n$git_unp" > /dev/null
+}
+
+
+
+
 
 
 #main execution with menus and calls
@@ -603,9 +665,17 @@ case "$cputype" in
                     cmd="$cmd;WigWag-settings $SUDO_USER"
                 ;;
                 "Setup/Repair-User")
-                    user_info
+                    user_info_ALL
                     cmd="$cmd;setup_repair_user $OS_un $OS_unp $svn_un $svn_unp $git_un $git_unp"
                 ;;
+		"Clone_contiki-main")
+		    user_info_git
+		    cmd="$cmd;checkout_git_generic $git_un $git_unp $SUDO_USER contiki-main"
+		;;
+		"Clone_contiki-LEDE")
+		    user_info_git
+		    cmd="$cmd;checkout_git_generic $git_un $git_unp $SUDO_USER conitki-LEDE"
+		    ;;
             esac
         done
     ;;
@@ -657,48 +727,4 @@ always_run
 
 
 
-
-
-
-# for ray in ${USERselection_ray[@]} 
-# do
-# if [ $ray = "NOA" ]; then
-# NOA $SYSTEM_USER
-# fi
-# if [ $ray = "FG" ]; then
-# FG $SYSTEM_USER
-# fi
-# if [ $ray = "SNF" ]; then
-# SNF $RH_USER $RH_USER_PASS
-# fi
-# if [ $ray = "FP" ]; then
-# FP $SYSTEM_USER
-# fi
-# if [ $ray = "FPM" ]; then
-# FPM $SYSTEM_USER
-# fi
-# if [ $ray = "DE" ]; then
-# DE $SYSTEM_USER
-# fi
-# if [ $ray = "CKD" ]; then
-# CKD $RH_USER $RH_USER_PASS
-# fi
-# done
-
-
-
-
-# #https://help.gnome.org/users/zenity/stable/index.html.en
-
-
-# #yn "Create new user account on this os? y/n" new_OS_account
-# #yn "Fix the groups for the user? y/n" fix_groups
-# #yn "Would you like to set the netrc_file? y/n" set_netrc_file
-# #yn "Would you like to build your path? y/n" fix_path
-# #yn "Would you like to checkout dev-tools? y/n" checkout_devtools
-# #yn "Would you like to build launch buttons (only for mint users)? y/n" launcherbuttons
-# #yn "Would you like to checkout eclipse for contiki development? y/n" doeclipse
-# #yn "Would you like to repair permissons? y/n" fix_permissions
-# #yn "If this is a mint install, would you like launcherbuttons rebuilt? y/n" launcherbuttons
-# #yn "Would you like to reboot your system? y/n" rebootsystem
 

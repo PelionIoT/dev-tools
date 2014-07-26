@@ -2,6 +2,10 @@
 
 
 # NOTE: this requires the cadaver version here be installed https://github.com/WigWagCo/cadaver
+#./configure --with-ssl=openssl
+#make
+#make install
+
 # this -A option is our own creation
 CADAVER="cadaver -A"
 
