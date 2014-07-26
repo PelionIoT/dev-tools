@@ -12,7 +12,7 @@ COLOR_NORMAL="echo -ne '\E[0m'"
 #ADDCP=$UTILZ_BASE:$UTILZ_BASE/bin:$UTILZ_BASE/lib/log4j-1.2.15.jar
 #JRE=/usr/lib/classpath
 
-REPO_BASE="https://izuma.repositoryhosting.com/webdav/izuma_frzwebproj"
+REPO_BASE="https://code.wigwag.com"
 MANIFEST="manifest.lst"
 MD5_FILENAME="checksum.lst"
 MD5_CHKSUM_EXT=".$$.lst"
@@ -21,9 +21,9 @@ EXPORT_DIR="${EXP_DIR}/prereqs.new"
 FINAL_DIR="${EXP_DIR}/prereqs"
 PRE_META_DIR="${EXP_DIR}/.prereqs"
 PRE_LAST_POSTFIX=".last"
-WGET_CMD="wget "
-WGET_CMD_QUIET="wget -nv "
-WGET_CMD_QUIET_STDOUT="wget -qO- "
+WGET_CMD="wget --no-check-certificate "
+WGET_CMD_QUIET="wget --no-check-certificate -nv "
+WGET_CMD_QUIET_STDOUT="wget --no-check-certificate -qO- "
 GLOBAL_ERROR_FILE=`basename $0`.err
 GLOBAL_LOG_FILE=$EXP_DIR/`basename $0`.log.tmp
 
@@ -336,6 +336,8 @@ FILE_LIST=`cat $MANIFEST`
 #do
 #done
 
+USE_URL_REGEX="#+\s+USE_URL=(.*)"
+
 rm -rf $EXPORT_DIR-temp
 mkdir $EXPORT_DIR-temp
 cd $EXPORT_DIR-temp
@@ -349,6 +351,18 @@ cat ../$MANIFEST | while read name; do
 #    echo "line: ${name}"
     LINENUM=$(( $LINENUM + 1 ))
     P=$(trim $name)
+
+    if [[ $P =~ $USE_URL_REGEX ]]; then
+	i=1
+	n=${#BASH_REMATCH[*]}
+	if [[ $i -lt $n ]]; then
+	    REPO_BASE=${BASH_REMATCH[$i]}
+	    eval $COLOR_BOLD
+	    echo "Using repo: $REPO_BASE"
+	    eval $COLOR_NORMAL
+	fi
+    fi
+	
     P=${P/#\#*/"-"}    
     if [ "${P}" == "-" ]; then   # skip comments
 	continue
