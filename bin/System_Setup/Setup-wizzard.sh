@@ -4,19 +4,19 @@ ACTION=$1
 #ACTION=testspace
 #http://johnreid.it/2009/09/26/mount-a-webdav-folder-in-ubuntu-linux/
 #WEBPATH=http://jira.framezcontrolz.com:7100/WigWag_build_environment
-REPO_BASE="https://izuma.repositoryhosting.com/webdav/izuma_frzwebproj"
+#REPO_BASE="https://izuma.repositoryhosting.com/webdav/izuma_frzwebproj"
+
+
 toolchain_dir=/wigwag/toolchain/
 git_credentials=x85446:mdtetdti123
 #UPDATES-------------------------------------------------
 #svn co https://izuma.repositoryhosting.com/svn/izuma_frzsoftware/dev-tools/bin/System_Setup/
 #chmod 770 -R System_Setup/
 #run this as root
-#sync_webdav -U https://izuma.repositoryhosting.com/webdav/izuma_frzwebproj/tools
+#upload everything: sync_webdav -U https://izuma.repositoryhosting.com/webdav/izuma_frzwebproj/tools
+#download everything: sync_webdav https://izuma.repositoryhosting.com/webdav/izuma_frzwebproj/tools
 
-#whiptail --yesno "Did you already know whiptail?" --yes-button "Yes, I did" --no-button "No, never heard of it"  10 70
-
-
-#http://mywiki.wooledge.org/BashFAQ/035#preview
+#command line scripts: http://mywiki.wooledge.org/BashFAQ/035#preview
 function parse-cline {
 
 
@@ -201,10 +201,6 @@ echo -e 'Result: '$(wp-getResults wp-yesno "yesno test text menu" "doit or not y
 #--------------------------
 
 
-function hardset_travis_repo {
-	sudo echo -e "machine izuma.repositoryhosting.com\nlogin travis\npassword 54isme">~/.netrc
-}
-
 function testforroot {
 	if [ `whoami` = "root" ]; then
 		roottest=1;
@@ -360,7 +356,8 @@ echo "RUNNING: New OS Account (NOA) on $1 with password $2"
 #set netrc file
 function set_netrc_file {
 echo "RUNNING: Set Netrc File (SNF) on user $1 with $2:$3"
-	sudo echo -e "machine izuma.repositoryhosting.com\nlogin $2\npassword $3">/home/$1/.netrc
+#	sudo echo -e "machine izuma.repositoryhosting.com\nlogin $2\npassword $3\n">/home/$1/.netrc
+	sudo echo -e "machine code.wigwag.com\nlogin $2\npassword $3\n">/home/$1/.netrc
 }	
 
 #fix permisions
@@ -377,16 +374,16 @@ function checkout_git(){
     gitline="$1:$2@github.com"
     proj=$4
     mhome=/home/$3
+    path=$5
 echo "RUNNING: Checkout $3 project at $mhome using $1:$2@github.com"
   cd $mhome
-    if [ -d $mhome  ]; then
-        cd $mhome
-	cd workspace
+    if [ -d $path  ]; then
+        cd $path
 	echo 	git clone https://$gitline/WigWagCo/$proj
 	git clone https://$gitline/WigWagCo/$proj
 	fix_user_permissions $3
     else
-        echo "Failed: could not find directory $mhome"
+        echo "Failed: could not find directory $path"
     fi
 }
 
@@ -401,9 +398,15 @@ update-prereqs.sh
 expand-prereqs.sh
 EOF
 }
-function checkout_git-generic(){
-    checkout_git $1 $2 $3 $4
-    process_prereqs $3 /home/$3/workspace/$4
+function checkout_git_generic(){
+    gituser=$1
+    gitpass=$2
+    sysuser=$3
+    gitproj=$4
+    checkoutpath=/home/$sysuser/workspace/
+
+    checkout_git $gituser $gitpass $sysuser $gitproj $checkoutpath
+    process_prereqs $sysuser /$checkoutpath/$gitproj
 }
 
 
@@ -416,13 +419,17 @@ function checkout_git-generic(){
 #$1: username to SVN
 #$2: password to SVN
 function checkout_dev_tools {
-    mhome=/home/$1
+    sysuser=$1
+    gituser=$2
+    gitpass=$3
+    mhome=/home/$sysuser
 echo "RUNNING: Checkout Dev Tools (CKD) at $mhome using $2:$3"
   cd $mhome
     if [ -d $mhome  ]; then
         cd $mhome
-        svn co --username $2 --password $3 https://izuma.repositoryhosting.com/svn/izuma_frzsoftware/dev-tools/
-        set_a_path $1 $mhome/dev-tools/bin/ devtools
+        #svn co --username $2 --password $3 https://izuma.repositoryhosting.com/svn/izuma_frzsoftware/dev-tools/
+        checkout_git $gituser $gitpass $sysuser "dev-tools" $mhome
+	set_a_path $1 $mhome/dev-tools/bin/ devtools
     else
         echo "Failed: could not find directory $mhome"
     fi
@@ -527,7 +534,7 @@ function setup_repair_user {
     set_user_groups $OSuser
     set_netrc_file $OSuser $netrcuser $netrcuserp
     test_for_path $OSuser
-    checkout_dev_tools $OSuser $netrcuser $netrcuserp
+    checkout_dev_tools $OSuser $gituser $gituserp
     fix_user_permissions $OSuser
 
 }
@@ -628,7 +635,7 @@ fi
 
 user_info_ALL() {
     user_info_system
-    user_info_svn
+    #user_info_svn
     user_info_git
     cat "$OS_un\n$OS_UNp\n$svn_un\n$svn_up\n$git_un\n$git_unp" > /dev/null
 }
@@ -715,7 +722,6 @@ always_run () {
     testforroot
     blow_away   
     test_for_path $SUDO_USER
-    hardset_travis_repo
     main
 }
 
