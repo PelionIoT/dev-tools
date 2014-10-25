@@ -6,6 +6,10 @@ ACTION=$1
 #WEBPATH=http://jira.framezcontrolz.com:7100/WigWag_build_environment
 #REPO_BASE="https://izuma.repositoryhosting.com/webdav/izuma_frzwebproj"
 
+#TODO
+#  - remove cloning dev-tools from the user fix
+
+
 
 toolchain_dir=/wigwag/toolchain/
 git_credentials=x85446:mdtetdti123
@@ -237,6 +241,11 @@ function Apt-get-Typical-DeveloperUI { #WigWag required software for developer s
         sudo dpkg -i google-chrome-stable_current_i386.deb &&
         rm -f google-chrome-stable_current_i386.deb
     fi
+    echo "Cleaning Up" &&
+    sudo apt-get -f install &&
+    sudo apt-get autoremove &&
+    sudo apt-get -y autoclean &&
+    sudo apt-get -y clean
 }
 
 #ia32-libs replaced by lib32z1 lib32ncurses5 lib32bz2-1.0
@@ -260,7 +269,7 @@ function Apt-get-typical32 { #WigWag required software for 64station
 
 
 function Apt-get-all-typical {
-sudo apt-get -y install acl autoconf autotools-dev bison build-essential cmake davfs2 dpkg-dev emacs emacs-goodies-el flex fusedav g++ git gcc gnome-session-fallback libboost-all-dev libc6-dev libcurl3 libdevice-serialport-perl libexpat1-dev libftdi-dev libncurses5-dev libpcap0.8-dev libqt4-dev libterm-readkey-perl libsvn-java linux-headers-`uname -r` make nano openjdk-6-jdk patch qt4-qmake srecord ssh subversion texinfo tshark xterm
+sudo apt-get -y install acl autoconf autotools-dev bison build-essential cmake davfs2 dpkg-dev emacs emacs-goodies-el flex fusedav g++ git gcc gnome-session-fallback libboost-all-dev libc6-dev libcurl3 libdevice-serialport-perl libexpat1-dev libftdi-dev libncurses5-dev libpcap0.8-dev libqt4-dev libterm-readkey-perl libsvn-java libssl-dev libssl-doc linux-headers-`uname -r` make nano openjdk-6-jdk patch qt4-qmake srecord ssh subversion texinfo tshark xterm
     system_type=$(detect_bits)
     if [ $(getconf LONG_BIT) = "64" ]; then
         Apt-get-typical64
@@ -306,7 +315,7 @@ function fix_ftdi_user { #fix ftdi group users
 #-----USER Stuff-----------------------------------------------------------------------
 #--------------------------------------------------------------------------------------
 create_path_dir() {
-    echo "XXXX create_path_dir($1)"
+    echo "create_path_dir($1)"
     if [ ! -d /home/$1/.paths ]; then #if it doesn't exist, 
         mkdir /home/$1/.paths
         echo "PATH=\$PATH:\$(find \$HOME/.paths/ | tr -s '\n' ':')">>/home/$1/.profile
@@ -329,6 +338,7 @@ set_a_path() {
     echo "RUNNING: Set a Path (FP) for $uhome on $target for $link"
     create_path_dir $1
     ln -s $target $uhome/.paths/$link
+    echo ln -s $target $uhome/.paths/$link
     test_for_path $1
 }
 
@@ -350,6 +360,7 @@ echo "RUNNING: New OS Account (NOA) on $1 with password $2"
         sudo useradd -m -s /bin/bash $1
     fi
 	echo -e "$2\n$2" | (sudo passwd $1)
+	mv /tmp/.pwdfile /home/$1/
 }
 
 
@@ -371,11 +382,13 @@ echo "COMMAND: chown -R $1:$1 /home/$1/"
 
 #checkout any git project
 function checkout_git(){
+    echo "checkout_git($1,$2,$3,$4,$5)"
     gitline="$1:$2@github.com"
     proj=$4
-    mhome=/home/$3
+    newhome=$3
     path=$5
-echo "RUNNING: Checkout $3 project at $mhome using $1:$2@github.com"
+    mkdir -p $path
+echo "RUNNING: Checkout $4 project at $newhome using $1:$2@github.com"
   cd $mhome
     if [ -d $path  ]; then
         cd $path
@@ -406,12 +419,12 @@ function checkout_git_generic(){
     checkoutpath=/home/$sysuser/workspace/
 
     checkout_git $gituser $gitpass $sysuser $gitproj $checkoutpath
-    process_prereqs $sysuser /$checkoutpath/$gitproj
+    process_prereqs $sysuser $checkoutpath$gitproj
 }
 
 
-#$cmd="$cmd;fix_user_permissions $SUDO_USER"		    cmd="$cmd;update-prereqs.sh;expand-prereqs.sh"
-#		    cmd="$cmd;fix_user_permissions $SUDO_USER"
+
+
 
 
 
@@ -419,6 +432,7 @@ function checkout_git_generic(){
 #$1: username to SVN
 #$2: password to SVN
 function checkout_dev_tools {
+    echo "checkout_dev_tools($1,$2,$3)"
     sysuser=$1
     gituser=$2
     gitpass=$3
@@ -427,9 +441,16 @@ echo "RUNNING: Checkout Dev Tools (CKD) at $mhome using $2:$3"
   cd $mhome
     if [ -d $mhome  ]; then
         cd $mhome
+	if [ ! -d $mhome/workspace/dev-tools/ ]; then
         #svn co --username $2 --password $3 https://izuma.repositoryhosting.com/svn/izuma_frzsoftware/dev-tools/
         checkout_git $gituser $gitpass $sysuser "dev-tools" $mhome
-	set_a_path $1 $mhome/dev-tools/bin/ devtools
+	checkout_git $gituser $gitpass $sysuser "cadaver" $mhome
+	cd /$mhome/workspace/cadaver/
+	./configure --with-ssl=openssl
+	make
+	make install
+	fi;
+	set_a_path $sysuser $mhome/dev-tools/bin/ devtools
     else
         echo "Failed: could not find directory $mhome"
     fi
@@ -522,14 +543,14 @@ function WigWag-settings {
 
 
 function setup_repair_user {
-    echo "setup_user($1 $2 $3 $4 $5 $6)"
+    echo "setup_repair_user($1 $2 $3 $4 $5 $6)"
     OSuser=$1
     OSuserp=$2
     netrcuser=$3
     netrcuserp=$4
     gituser=$5
     gituserp=$6
-
+    
     new_user_account $OSuser $OSuserp
     set_user_groups $OSuser
     set_netrc_file $OSuser $netrcuser $netrcuserp
@@ -604,40 +625,107 @@ develop_task_menu () {
 
 OS_un=""
 OS_unp=""
+OS_tt=""
 svn_un=""
 svn_unp=""
+svn_tt=""
 git_un=""
 git_unp=""
+git_tt=""
+code_un=""
+code_unp=""
+code_tt=""
 
-
+user_info_load(){
+    echo "user_info_load($1)"
+    uil=$1
+    tfile=/home/$uil/.pwdfile
+    testv=0;
+    if [ -e $tfile ]; then
+	while read line
+	do
+	    echo "reading $testv) $line"
+	    case $testv in
+		1)
+		    OS_unp=$line
+		    ;;
+		2)
+		    svn_un=$line
+		    ;;
+		3)
+		    svn_unp=$line
+		    ;;
+		4)
+		    git_un=$line
+		    ;;
+		5)
+		    git_unp=$line
+		    ;;
+		6)
+		    code_un=$line
+		    ;;
+		7)
+		    code_unp=$line
+		    ;;		
+	    esac
+	    ((testv++))
+	done < $tfile
+    fi
+#exit
+}
+		    
+	    
 
 user_info_svn(){
-if [ "$svn_un" == "" ]; then
-    svn_un=$(wp-getResults wp-input "SVN username" "User: $un izuma.repositoryhosting.com username?" "$SUDO_USER")
-    svn_unp=$(wp-getResults wp-pass "$svn_un password" "User: $svn_un @izuma.repositoryhosting.com  password?" "")
+if [ "$svn_tt" !=1  ]; then
+     if [ "$OS_un" = "" ]; then
+	user_info_load $SUDO_USER
+    fi
+    svn_un=$(wp-getResults wp-input "SVN username" "User: $un izuma.repositoryhosting.com username?" "$svn_un")
+    svn_unp=$(wp-getResults wp-pass "$svn_un password" "User: $svn_un @izuma.repositoryhosting.com  password?" "$svn_unp")
+svn_tt=1;
 fi
 }
 
+user_info_code(){
+if [ "$code_tt" != 1 ]; then
+     if [ "$OS_un" = "" ]; then
+	user_info_load $SUDO_USER
+    fi
+    code_un=$(wp-getResults wp-input "Code username" "User: $OS_un code.wgiwag.com username?" "$code_un")
+    code_unp=$(wp-getResults wp-pass "$code_un password" "User: $code_un @code.wigwag.com  password?" "$code_unp")
+fi
+code_tt=1;
+}
+
 user_info_system(){
-if [ "$OS_un" == "" ]; then
+if [ "$OS_tt" != 1 ]; then
     OS_un=$(wp-getResults wp-input "System username" "What username do you want for this System? (caps count!)" "$SUDO_USER")
-    OS_unp=$(wp-getResults wp-pass "$un password" "User: $un password?")
+    user_info_load $OS_un
+    OS_unp=$(wp-getResults wp-pass "$un password" "User: $OS_un password?" "$OS_unp")
+OS_tt=1;
 fi
 }
 
 user_info_git(){
-if [ "$git_un" == "" ]; then
-    git_un=$(wp-getResults wp-input "github username" "User $un github username?" "$SUDO_USER")
-    git_unp=$(wp-getResults wp-pass "$svn_un password" "User: $git_un @github.com password?" "")
+if [ "$git_tt" != 1 ]; then
+    if [ "$OS_un" = "" ]; then
+	user_info_load $SUDO_USER
+    fi
+    git_un=$(wp-getResults wp-input "github username" "User $OS_un github username?" "$git_un")
+    git_unp=$(wp-getResults wp-pass "$git_un password" "User: $git_un @github.com password?" "$git_unp")
+git_tt=1;
 fi
 }
 
 
 user_info_ALL() {
+    echo "user_info_All()"
     user_info_system
     #user_info_svn
+    user_info_code
     user_info_git
-    cat "$OS_un\n$OS_UNp\n$svn_un\n$svn_up\n$git_un\n$git_unp" > /dev/null
+    echo -e "$OS_un\n$OS_unp\n$svn_un\n$svn_unp\n$git_un\n$git_unp\n$code_un\n$code_unp" > /tmp/.pwdfile
 }
 
 
@@ -673,7 +761,7 @@ case "$cputype" in
                 ;;
                 "Setup/Repair-User")
                     user_info_ALL
-                    cmd="$cmd;setup_repair_user $OS_un $OS_unp $svn_un $svn_unp $git_un $git_unp"
+                    cmd="$cmd;setup_repair_user $OS_un $OS_unp $code_un $code_unp $git_un $git_unp"
                 ;;
 		"Clone_contiki-main")
 		    user_info_git
