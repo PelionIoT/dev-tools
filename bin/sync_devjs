@@ -1,0 +1,127 @@
+#!/bin/bash
+
+if [ -e $HOME/dev-tools/bin/commons.source ]; then
+    source $HOME/dev-tools/bin/commons.source
+    setup_colors
+else
+    echo "Where is your $HOME/dev-tools/bin/commons.source ?"
+fi
+
+
+
+
+function print_usage () {
+    echo "Usage $0 [ -u {user}, -d, -p, -k {key-file} ] IP local_dir remote_dir"
+    echo "d: delete files on destination if not present in local dir (BE CAREFUL)"
+    echo "p: pretend (show me what you would do)"
+    echo "r: reverse (PULL not a push)"
+    echo "u: use {user} instead of 'root'"
+}
+
+
+
+
+function onexit() {
+    local exit_status=${1:-$?}
+    eval $COLOR_RED
+    echo "Error - $0 did not complete."
+    eval $COLOR_NORMAL
+    rm -f *.tmp
+    exit $exit_status
+}
+
+function onerror() {
+    eval $COLOR_RED
+    echo "Error..."
+    eval $COLOR_YELLOW
+    echo "$@"
+    eval $COLOR_NORMAL
+    rm -f *.tmp
+    exit 1
+}
+
+REMOTEUSER="root"
+
+####### ENTRY POINT ######
+while getopts  "dpr" flag 
+do
+	case "${flag}" in
+		d)
+			#DIRSEARCH=${OPTARG} 
+			DELETE=1
+			;;
+	    u) 
+                REMOTEUSER=${OPTARG}
+                ;;
+	    p) 
+		PRETEND=1
+		;;
+	    k) 
+		KEY=${$OPTARG}
+		;;
+	    r) 
+		REVERSE=1
+		;;
+
+	    *)
+		print_usage
+		exit
+		;;
+	esac
+done            
+
+shift $(($OPTIND - 1))
+
+if [ -e "$KEY" ]; then
+    chmod 600 "$KEY"
+fi
+
+if [ "$#" -lt 3 ]; then
+    print_usage
+    exit 1
+fi
+
+IPADDR=$1
+LOCALDIR=$2
+REMOTEDIR=$3
+
+
+
+SYNCOPTS=""
+
+if [ ! -z $DELETE ]; then
+    SYNCOPTS="$SYNCOPTS --delete"
+fi
+
+if [ ! -z $PRETEND ]; then
+    SYNCOPTS="$SYNCOPTS --dry-run"
+fi
+
+
+
+if [ ! -z $REVERSE ]; then
+    echo "PULLING: ${REMOTEUSER}@${IPADDR}:${REMOTEDIR} ---> ${LOCALDIR}"
+    echo "------------"
+    rsync -rltvz $SYNCOPTS  --exclude 'rebuild.sh' --exclude '.DS_Store' --exclude '.htaccess' --exclude '*~' -e "ssh -i $KEY" ${REMOTEUSER}@${IPADDR}:$REMOTEDIR $LOCALDIR
+else
+    echo "PUSHING: ${LOCALDIR} ---> ${REMOTEUSER}@${IPADDR}:${REMOTEDIR}"
+    echo "------------"
+    rsync -rltvz $SYNCOPTS  \
+--exclude 'node_modules' \
+--exclude 'node/*' \
+--exclude 'conf/*' \
+--exclude '.git' \
+--exclude '.gitmodules' \
+--exclude 'expanded-prereqs/*' \
+--exclude '.gitignore' \
+--exclude '.cproject' \
+--exclude '.project' \
+--exclude 'core/utils/native_utils' \
+--exclude 'build/Release' \
+--exclude 'build/Debug' \
+--exclude '*.a' \
+--exclude '*.so' \
+--exclude '*.node' \
+$LOCALDIR ${REMOTEUSER}@${IPADDR}:${REMOTEDIR}
+    # -e "ssh -i $KEY"
+fi
