@@ -113,6 +113,7 @@ else
 --exclude '.git' \
 --exclude '.gitmodules' \
 --exclude 'expanded-prereqs/*' \
+--exclude 'libexec/*' \
 --exclude '.gitignore' \
 --exclude '.cproject' \
 --exclude '.project' \
