@@ -112,6 +112,8 @@ else
 --exclude 'conf/*' \
 --exclude '.git' \
 --exclude '.gitmodules' \
+--exclude '.prereqs/*' \
+--exclude 'prereqs/*' \
 --exclude 'expanded-prereqs/*' \
 --exclude 'libexec/*' \
 --exclude '.gitignore' \
