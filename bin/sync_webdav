@@ -108,7 +108,7 @@ END
 
     cat $TEMPNAME | while read onel; do
 	DIRNAME=`echo "${onel}" | sed -e 's/^Coll:\s\+\(\S\+\)\s\+.*/Dir=\1/' -e '/Dir=/ !d' -e 's/^Dir=\(.*\)/\1/'` 
-	echo "DIRNAME: ${one1} --> $DIRNAME"
+#	echo "DIRNAME: ${one1} --> $DIRNAME"
 	echo -n "$DIRNAME " >> $TEMPNAME2
     done
 
@@ -119,7 +119,7 @@ END
     cat $TEMPNAME | while read onel; do
 	# remove lines beggining with: "Connection " "Listing " and "dav:" then grab file name minus a '*' in front of it
 	FNAME=`echo "${onel}" | sed -e '/^dav\:/ d' -e '/^Coll\:/ d' -e '/^Connection\s/ d' -e '/^Listing\s/ d' -e 's/\*\?\(\S*\)\s\+.*/F=\1/'  -e '/F=/ !d' -e 's/^F=\(.*\)/\1/'` 
-	echo "FILENAME: ${one1} --> $FNAME"
+#	echo "FILENAME: ${one1} --> $FNAME"
 	echo -n "$FNAME " >> $TEMPNAME2
     done
 
@@ -189,7 +189,7 @@ function get_remote_files() {
     do
 	echo "get ${f}" >> $TEMPNAME
 	echo "${f}" >> $TEMPNAME
-	echo "REMOTE: $TEMPNAME"
+#	echo "REMOTE: $TEMPNAME"
     done
 
     if [ ! -z $1 ]; then
