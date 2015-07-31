@@ -11,7 +11,7 @@ AMOUNT="+1"
 
 print_usage()
 {
-    echo "Usage: $0 process-name"
+    echo "Usage: $0 process-name [process-name ... ]"
     echo " -a AMOUNT   where AMOUNT is a renice value like '-1' or '+5'"
 }
 
@@ -45,7 +45,7 @@ do
     echo "Renice process: $arg ($PIDS) by $AMOUNT"
     for pid in $PIDS
     do
-	renice $AMOUNT -p $pid
+	sudo renice $AMOUNT -p $pid
     done
     
 done
