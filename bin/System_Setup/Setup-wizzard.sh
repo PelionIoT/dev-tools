@@ -1,4 +1,5 @@
 #!/bin/bash
+#this was one crazy script
 GUI=0;
 ACTION=$1
 #ACTION=testspace
