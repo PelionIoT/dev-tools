@@ -4,8 +4,8 @@ if [ $# -lt 1 ]; then
     print_usage
 fi
 
-source $HOME/dev-tools/bin/commons.source
-source $HOME/.backupToS3.config
+#source $HOME/dev-tools/bin/commons.source
+#source $HOME/.backupToS3.config
 
 AMOUNT="+1"
 
