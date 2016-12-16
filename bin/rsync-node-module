@@ -21,16 +21,17 @@ fi
 
 function print_usage () {
     echo "Usage $0 local remote"
+    echo "-p pretend (just show what you would do)"
     echo "-S source only (don't copy the build of the module)"
 }
 
-while getopts "S" opt; do
+while getopts "Sp" opt; do
   case $opt in
      S)
         SOURCE_ONLY=1
         shift
         ;;
-     P)
+     p)
        PRETEND=yes
        shift
        ;;
@@ -64,7 +65,7 @@ fi
 eval $COLOR_BOLD
 echo rsync -rltvz $SYNC_OPTS $SRC $DST
 eval $COLOR_NORMAL
-rsync -rltvz $SYNC_OPTS --exclude \
+rsync -rltvz --checksum $SYNC_OPTS \
 --exclude 'node_modules' \
 --exclude 'build' \
 --exclude '.git' \
